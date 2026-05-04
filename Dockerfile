@@ -44,7 +44,9 @@ ENV BUNDLE_PATH=/usr/local/bundle \
     BUNDLE_DEPLOYMENT=1 \
     RAILS_ENV=production \
     RAILS_LOG_TO_STDOUT=1 \
-    RAILS_SERVE_STATIC_FILES=1
+    RAILS_SERVE_STATIC_FILES=1 \
+    LD_PRELOAD=libjemalloc.so.2 \
+    MALLOC_CONF=dirty_decay_ms:1000,narenas:2,background_thread:true
 
 RUN apt-get update -qq \
  && apt-get install -y --no-install-recommends \
@@ -53,12 +55,16 @@ RUN apt-get update -qq \
       libmariadb3 \
       curl \
       tzdata \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --system --gid 1000 lobsters \
+ && useradd --system --uid 1000 --gid 1000 --create-home --shell /bin/bash lobsters
 
 WORKDIR /app
 
 COPY --from=builder /usr/local/bundle /usr/local/bundle
-COPY --from=builder /app /app
+COPY --from=builder --chown=lobsters:lobsters /app /app
+
+USER lobsters
 
 EXPOSE 3000
 
