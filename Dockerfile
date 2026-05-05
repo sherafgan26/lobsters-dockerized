@@ -68,4 +68,7 @@ USER lobsters
 
 EXPOSE 3000
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -fsS http://localhost:3000/up || exit 1
+
 CMD ["bin/rails", "server", "-b", "0.0.0.0", "-p", "3000"]
