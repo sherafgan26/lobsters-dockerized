@@ -1,0 +1,59 @@
+# Production-leaning compose file. Layered on top of docker-compose.yaml when
+# you want to run the locally-built production image instead of the dev one:
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.prod.yml up
+#
+# It overrides the `app` service (drops the source mount, uses the prod
+# Dockerfile, adds a restart policy and log rotation) and pins the DB
+# password to a value from `.env`.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/sherafgan26/lobsters:${LOBSTERS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      RAILS_ENV: production
+      DATABASE_HOST: db
+      DATABASE_USER: ${DATABASE_USER:-lobsters}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+    volumes: []  # no source mount in prod
+    ports:
+      - "3000:3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: docker.io/library/mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DATABASE_NAME:-lobsters_production}
+      MARIADB_USER: ${DATABASE_USER:-lobsters}
+      MARIADB_PASSWORD: ${DATABASE_PASSWORD}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  db_data: {}
