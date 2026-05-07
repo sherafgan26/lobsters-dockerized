@@ -55,5 +55,24 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  worker:
+    image: ghcr.io/sherafgan26/lobsters:${LOBSTERS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["bin/jobs", "start"]
+    environment:
+      RAILS_ENV: production
+      DATABASE_HOST: db
+      DATABASE_USER: ${DATABASE_USER:-lobsters}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+    depends_on:
+      db:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   db_data: {}
