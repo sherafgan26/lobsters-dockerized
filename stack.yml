@@ -1,0 +1,100 @@
+# Docker Swarm stack file for Lobsters.
+#
+# One-time setup on the manager node:
+#
+#   docker swarm init
+#
+#   printf '%s' "${SECRET_KEY_BASE}"   | docker secret create lobsters_secret_key_base -
+#   printf '%s' "${DATABASE_PASSWORD}" | docker secret create lobsters_db_password -
+#   printf '%s' "${DATABASE_ROOT_PASSWORD}" | docker secret create lobsters_db_root_password -
+#
+# Deploy:
+#
+#   docker stack deploy -c stack.yml --with-registry-auth lobsters
+
+version: "3.9"
+
+services:
+  app:
+    image: ghcr.io/sherafgan26/lobsters:${LOBSTERS_IMAGE_TAG:-latest}
+    environment:
+      RAILS_ENV: production
+      DATABASE_HOST: db
+      DATABASE_USER: lobsters
+      SECRET_KEY_BASE_FILE: /run/secrets/lobsters_secret_key_base
+      DATABASE_PASSWORD_FILE: /run/secrets/lobsters_db_password
+    secrets:
+      - lobsters_secret_key_base
+      - lobsters_db_password
+    networks:
+      - lobsters_net
+    ports:
+      - target: 3000
+        published: 80
+        mode: ingress
+    deploy:
+      replicas: 3
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  worker:
+    image: ghcr.io/sherafgan26/lobsters:${LOBSTERS_IMAGE_TAG:-latest}
+    command: ["bin/jobs", "start"]
+    environment:
+      RAILS_ENV: production
+      DATABASE_HOST: db
+      DATABASE_USER: lobsters
+      SECRET_KEY_BASE_FILE: /run/secrets/lobsters_secret_key_base
+      DATABASE_PASSWORD_FILE: /run/secrets/lobsters_db_password
+    secrets:
+      - lobsters_secret_key_base
+      - lobsters_db_password
+    networks:
+      - lobsters_net
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+
+  db:
+    image: docker.io/library/mariadb:11
+    environment:
+      MARIADB_DATABASE: lobsters_production
+      MARIADB_USER: lobsters
+      MARIADB_PASSWORD_FILE: /run/secrets/lobsters_db_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/lobsters_db_root_password
+    secrets:
+      - lobsters_db_password
+      - lobsters_db_root_password
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - lobsters_net
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+networks:
+  lobsters_net:
+    driver: overlay
+
+volumes:
+  db_data:
+
+secrets:
+  lobsters_secret_key_base:
+    external: true
+  lobsters_db_password:
+    external: true
+  lobsters_db_root_password:
+    external: true
