@@ -43,6 +43,15 @@ services:
         condition: on-failure
         delay: 5s
         max_attempts: 3
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 256M
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.lobsters.rule: "Host(`lobsters.example.com`)"
+        traefik.http.services.lobsters.loadbalancer.server.port: "3000"
 
   worker:
     image: ghcr.io/sherafgan26/lobsters:${LOBSTERS_IMAGE_TAG:-latest}
