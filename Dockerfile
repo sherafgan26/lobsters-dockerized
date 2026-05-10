@@ -16,7 +16,9 @@ ENV BUNDLE_PATH=/usr/local/bundle \
     BUNDLE_FROZEN=1 \
     RAILS_ENV=production
 
-RUN apt-get update -qq \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update -qq \
  && apt-get install -y --no-install-recommends \
       build-essential \
       libjemalloc-dev \
@@ -24,13 +26,13 @@ RUN apt-get update -qq \
       libmariadb-dev \
       pkg-config \
       git \
-      curl \
- && rm -rf /var/lib/apt/lists/*
+      curl
 
 WORKDIR /app
 
 COPY Gemfile Gemfile.lock .ruby-version ./
-RUN bundle install --jobs 4 --retry 3
+RUN --mount=type=cache,target=/root/.bundle/cache \
+    bundle install --jobs 4 --retry 3
 
 COPY . .
 
